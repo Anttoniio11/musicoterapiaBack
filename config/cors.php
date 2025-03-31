@@ -16,13 +16,14 @@ return [
     */
 
 
-    'paths' => ['api/*', 'v1/*'],  // Permite CORS en rutas específicas
-    'allowed_methods' => ['*'],  // Permite todos los métodos HTTP (GET, POST, PUT, DELETE, etc.)
-    'allowed_origins' => ['*'],  // Permite solicitudes desde cualquier origen
+    'paths' => ['api/', 'v1/'],  // Permite CORS en rutas específicas
+    'allowed_methods' => [''],  // Permite todos los métodos HTTP (GET, POST, PUT, DELETE, etc.)
+    // TODO: just allow the frontend origin
+    'allowed_origins' => [''],  // Permite solicitudes desde cualquier origen
     'allowed_origins_patterns' => [],  // Puedes agregar patrones específicos si es necesario
-    'allowed_headers' => ['*'],  // Permite todos los encabezados en las solicitudes
+    'allowed_headers' => [''],  // Permite todos los encabezados en las solicitudes
     'exposed_headers' => [],  // Lista de encabezados que serán visibles en el cliente
     'max_age' => 0,  // Tiempo en segundos para almacenar en caché las respuestas de preflight (0 = desactivado)
-    'supports_credentials' => false,  // Cambia a `true` si necesitas enviar cookies o autenticación con la solicitud
+    'supports_credentials' => false,  // Cambia a true si necesitas enviar cookies o autenticación con la solicitud
 
 ];
