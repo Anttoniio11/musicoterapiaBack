@@ -39,6 +39,8 @@ Route::apiResource('audios', AudioController::class);
 // route to save an audio
 // Route::post('audios/save', [AudioController::class, 'store']);
 
+// Rutas para pocast
+Route::apiResource('podcasts', PodcastController::class);
 
 // Rutas para Playlist
 Route::apiResource('playlists', PlaylistController::class);
@@ -66,14 +68,23 @@ Route::apiResource('histories', HistoryController::class);
 
 
 // RUTAS PARA ELIMINAR REGISTROS DE LA RELACION DE PLAYLIST
-Route::delete('/playlists/{playlist}/podcasts/{podcast}', [PlaylistController::class, 'removePodcast']);
+// Rutas para Playlist
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('playlists', PlaylistController::class);
+    Route::post('/playlists/{playlist}/audios', [PlaylistController::class, 'addAudio']);
+    Route::get('/playlists/{playlist}/audios', [PlaylistController::class, 'listAudios']);
+    Route::put('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'updateAudio']);
+    Route::delete('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'removeAudio']);
+    Route::delete('/playlists/{playlist}/podcasts/{podcast}', [PlaylistController::class, 'removePodcast']);
+});
+// Route::delete('/playlists/{playlist}/podcasts/{podcast}', [PlaylistController::class, 'removePodcast']);
 
 
-// audioPlailist
-Route::post('/playlists/{playlist}/audios', [PlaylistController::class, 'addAudio']);
-Route::get('/playlists/{playlist}/audios', [PlaylistController::class, 'listAudios']);
-Route::put('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'updateAudio']);
-Route::delete('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'removeAudio']);
+// // audioPlailist
+// Route::post('/playlists/{playlist}/audios', [PlaylistController::class, 'addAudio']);
+// Route::get('/playlists/{playlist}/audios', [PlaylistController::class, 'listAudios']);
+// Route::put('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'updateAudio']);
+// Route::delete('/playlists/{playlist}/audios/{audio}', [PlaylistController::class, 'removeAudio']);
 
 
 // Rutas para asociar y desasociar tags con audios y podcasts
