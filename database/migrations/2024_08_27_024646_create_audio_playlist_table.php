@@ -13,11 +13,9 @@ return new class extends Migration
     {
         Schema::create('audio_playlist', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('audio_id')->constrained('audios')->onDelete('cascade');
+            $table->foreignId('audio_id')->constrained('audios')->onDelete('cascade'); // Referencia explícita
             $table->foreignId('playlist_id')->constrained('playlists')->onDelete('cascade');
-
-
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }

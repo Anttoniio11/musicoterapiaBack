@@ -13,14 +13,13 @@ return new class extends Migration
     {
         Schema::create('podcasts', function (Blueprint $table) {
             $table->id();
-
             $table->string('title');
             $table->text('description')->nullable();
-            $table->string('image_file')->nullable(); 
-            $table->string('video_file')->unique(); 
-            $table->integer('duration')->comment('Duration in seconds');
-
-
+            $table->string('image_file')->nullable();
+            $table->string('image_public_id')->nullable();
+            $table->string('video_file');
+            $table->string('video_public_id');
+            $table->integer('duration')->comment('Duración en segundos');
             $table->timestamps();
         });
     }

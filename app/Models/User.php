@@ -22,8 +22,8 @@ class User extends Authenticatable implements CanResetPassword
      protected $allowIncluded = ['likes', 'histories', 'playlists'];
      protected $allowFilter = ['id', 'name'];
      protected $allowSort = ['id', 'name'];
- 
- 
+
+
 
     /**
      * The attributes that are mass assignable.
@@ -32,9 +32,9 @@ class User extends Authenticatable implements CanResetPassword
      */
     protected $fillable = [
         'name',
+        'birthdate',
         'email',
         'password',
-        'birthdate',
     ];
 
     /**

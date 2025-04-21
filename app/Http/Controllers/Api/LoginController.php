@@ -5,9 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
-
 use App\Models\User;
 
 class LoginController extends Controller
@@ -16,87 +13,22 @@ class LoginController extends Controller
     {
         $credentials = $request->validate([
             'email' => 'required|email',
-            'password' => 'required',
+            'password' => 'required|string',
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
-            $token = $user->createToken('auth_token')->plainTextToken;
-
+        if (!Auth::attempt($credentials)) {
             return response()->json([
-                'message' => 'Login exitoso',
-                'user' => $user,
-                'token' => $token,
-            ], 200);
+                'message' => 'Credenciales inválidas'
+            ], 401);
         }
 
-        return response()->json(['error' => 'Credenciales inválidas'], 401);
-    }
-    // public function login(Request $request)
-    // {
-    //     $credentials = $request->only('email', 'password');
-    //     $user = User::where('email', $credentials['email'])->first();
+        $user = User::where('email', $request->email)->first();
+        $token = $user->createToken('auth_token')->plainTextToken;
 
-    //     // TODO: hash password 
-    //     // if ($user && $user->password === $credentials['password']) {
-    //     //     $token = $user->createToken('authToken')->plainTextToken;
-    //     //     return response()->json(['token' => $token], 200);
-    //     // }
-
-    //     if ($user && Hash::check($credentials['password'], $user->password)) {
-    //         $token = $user->createToken('authToken')->plainTextToken;
-    //         return response()->json(['token' => $token], 200);
-    //     }
-
-
-    //     return response()->json(['error' => 'Unauthorized'], 401);
-    // }
-
-    public function logout(Request $request)
-    {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Logout exitoso'], 200);
-    }
-
-    //-------------------------------------------------------
-
-    public function forgotPassword(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email|exists:users,email',
-        ]);
-
-        $status = Password::sendResetLink($request->only('email'));
-
-        return $status === Password::RESET_LINK_SENT
-            ? response()->json(['message' => 'Correo de recuperación enviado'], 200)
-            : response()->json(['error' => 'Error al enviar el correo'], 400);
-    }
-
-    /**
-     * Restablecer contraseña
-     */
-    public function resetPassword(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email|exists:users,email',
-            'token' => 'required',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
-        $status = Password::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password),
-                ])->save();
-
-                $user->tokens()->delete(); // Invalida los tokens existentes
-            }
-        );
-
-        return $status === Password::PASSWORD_RESET
-            ? response()->json(['message' => 'Contraseña restablecida correctamente'], 200)
-            : response()->json(['error' => 'Error al restablecer la contraseña'], 400);
+        return response()->json([
+            'message' => 'Login exitoso',
+            'token' => $token,
+            'token_type' => 'Bearer'
+        ], 200);
     }
 }

@@ -4,210 +4,203 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Podcast;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PodcastController extends Controller
 {
-
     public function index()
     {
-        $podcast = Podcast::included()
-            ->filter()
-            ->sort()
-            ->getOrPaginate();
-        return response()->json($podcast);
+        try {
+            $podcasts = Podcast::all();
+            return response()->json([
+                'status' => 'success',
+                'data' => $podcasts,
+                'message' => 'Podcasts obtenidos exitosamente'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching podcasts: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener podcasts'
+            ], 500);
+        }
     }
-
 
     public function store(Request $request)
     {
-        // Validar la solicitud
         $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'video_file' => 'required|mimes:mp4,mov,ogg,qt|max:20000|unique:podcasts,video_file',
-            'duration' => 'required|integer',
+            'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'video_file' => 'required|mimes:mp4,mov,ogg,qt|max:20480',
+            'duration' => 'required|integer|min:1',
         ]);
 
-        $imageFilePath = null;
-        $videoFilePath = null;
+        DB::beginTransaction();
+        try {
+            $imageData = [];
+            $videoData = [];
 
-        // Manejar la carga del archivo de imagen si está presente
-        if ($request->hasFile('image_file')) {
-            $imageFile = $request->file('image_file');
-
-            if ($imageFile->isValid()) {
-                try {
-                    // Subir la imagen a la carpeta "podcasts/images"
-                    $uploadedImage = Cloudinary::upload($imageFile->getRealPath(), [
-                        'folder' => 'podcasts/images',
-                        'public_id' => Str::random(10)
-                    ]);
-                    $imageFilePath = $uploadedImage->getSecurePath(); // Obtener la URL segura de la imagen
-                } catch (\Exception $e) {
-                    return response()->json(['error' => 'Failed to upload image to Cloudinary: ' . $e->getMessage()], 400);
-                }
-            } else {
-                return response()->json(['error' => 'Invalid image file or file not valid'], 400);
+            // Subir imagen
+            if ($request->hasFile('image_file')) {
+                $upload = Cloudinary::upload($request->file('image_file')->getRealPath(), [
+                    'folder' => 'podcasts/images',
+                    'public_id' => Str::slug($request->title) . '_' . time()
+                ]);
+                $imageData = [
+                    'image_file' => $upload->getSecurePath(),
+                    'image_public_id' => $upload->getPublicId()
+                ];
             }
+
+            // Subir video
+            $videoUpload = Cloudinary::upload($request->file('video_file')->getRealPath(), [
+                'resource_type' => 'video',
+                'folder' => 'podcasts/videos',
+                'public_id' => Str::slug($request->title) . '_' . time()
+            ]);
+            $videoData = [
+                'video_file' => $videoUpload->getSecurePath(),
+                'video_public_id' => $videoUpload->getPublicId()
+            ];
+
+            $podcast = Podcast::create(array_merge(
+                $request->only(['title', 'description', 'duration']),
+                $imageData,
+                $videoData
+            ));
+
+            DB::commit();
+            return response()->json([
+                'status' => 'success',
+                'data' => $podcast,
+                'message' => 'Podcast creado exitosamente'
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating podcast: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear podcast'
+            ], 500);
         }
-
-        // Manejar la carga del archivo de video
-        if ($request->hasFile('video_file')) {
-            $videoFile = $request->file('video_file');
-
-            if ($videoFile->isValid()) {
-                try {
-                    // Subir el video a la carpeta "podcasts/videos"
-                    $uploadedVideo = Cloudinary::upload($videoFile->getRealPath(), [
-                        'resource_type' => 'video', // Especifica que el tipo de recurso es un video
-                        'folder' => 'podcasts/videos',
-                        'public_id' => Str::random(10)
-                    ]);
-                    $videoFilePath = $uploadedVideo->getSecurePath();
-                } catch (\Exception $e) {
-                    return response()->json(['error' => 'Failed to upload video to Cloudinary: ' . $e->getMessage()], 400);
-                }
-            } else {
-                return response()->json(['error' => 'Invalid video file or file not valid'], 400);
-            }
-        }
-
-        // Crear el nuevo registro de podcast
-        $podcast = Podcast::create([
-            'title' => $request->title,
-            'description' => $request->description,
-            'image_file' => $imageFilePath,
-            'video_file' => $videoFilePath,
-            'duration' => $request->duration,
-        ]);
-
-        return response()->json($podcast, 201);
-
     }
 
     public function show($id)
     {
-        $podcast = Podcast::findOrFail($id);
-        return response()->json($podcast, 200);
+        try {
+            $podcast = Podcast::findOrFail($id);
+            return response()->json([
+                'status' => 'success',
+                'data' => $podcast,
+                'message' => 'Podcast obtenido exitosamente'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Podcast no encontrado'
+            ], 404);
+        }
     }
 
-
-
-
-    public function update(Request $request,$id)
+    public function update(Request $request, $id)
     {
-         // Validar la solicitud
-         $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'sometimes|nullable|string',
-            'image_file' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'video_file' => 'sometimes|nullable|mimes:mp4,mov,ogg,qt|max:20000|unique:podcasts,video_file,' . $id,
-            'duration' => 'sometimes|required|integer',
-        ]);
-
-        // Encontrar el podcast existente
         $podcast = Podcast::findOrFail($id);
 
+        $request->validate([
+            'title' => 'sometimes|string|max:255',
+            'description' => 'sometimes|nullable|string',
+            'image_file' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+            'video_file' => 'sometimes|nullable|mimes:mp4,mov,ogg,qt|max:20480',
+            'duration' => 'sometimes|integer|min:1',
+        ]);
+
         DB::beginTransaction();
-
         try {
-            // Manejar la carga del nuevo archivo de imagen si está presente
+            // Actualizar imagen
             if ($request->hasFile('image_file')) {
-                if ($podcast->image_file) {
-                    $publicId = pathinfo(basename($podcast->image_file), PATHINFO_FILENAME);
-                    Cloudinary::destroy('podcasts/images/' . $publicId);
+                if ($podcast->image_public_id) {
+                    Cloudinary::destroy($podcast->image_public_id);
                 }
 
-                $imageFile = $request->file('image_file');
-                if ($imageFile->isValid()) {
-                    $uploadedImage = Cloudinary::upload($imageFile->getRealPath(), [
-                        'folder' => 'podcasts/images',
-                        'public_id' => Str::random(10)
-                    ]);
-                    $podcast->image_file = $uploadedImage->getSecurePath();
-                } else {
-                    throw new \Exception('Invalid image file');
-                }
+                $upload = Cloudinary::upload($request->file('image_file')->getRealPath(), [
+                    'folder' => 'podcasts/images',
+                    'public_id' => Str::slug($request->title) . '_' . time()
+                ]);
+
+                $podcast->image_file = $upload->getSecurePath();
+                $podcast->image_public_id = $upload->getPublicId();
             }
 
-            // Manejar la carga del nuevo archivo de video si está presente
+            // Actualizar video
             if ($request->hasFile('video_file')) {
-                if ($podcast->video_file) {
-                    $publicId = pathinfo(basename($podcast->video_file), PATHINFO_FILENAME);
-                    Cloudinary::destroy('podcasts/videos/' . $publicId, ['resource_type' => 'video']);
+                if ($podcast->video_public_id) {
+                    Cloudinary::destroy($podcast->video_public_id, ['resource_type' => 'video']);
                 }
 
-                $videoFile = $request->file('video_file');
-                if ($videoFile->isValid()) {
-                    $uploadedVideo = Cloudinary::upload($videoFile->getRealPath(), [
-                        'resource_type' => 'video',
-                        'folder' => 'podcasts/videos',
-                        'public_id' => Str::random(10)
-                    ]);
-                    $podcast->video_file = $uploadedVideo->getSecurePath();
-                } else {
-                    throw new \Exception('Invalid video file');
-                }
+                $upload = Cloudinary::upload($request->file('video_file')->getRealPath(), [
+                    'resource_type' => 'video',
+                    'folder' => 'podcasts/videos',
+                    'public_id' => Str::slug($request->title) . '_' . time()
+                ]);
+
+                $podcast->video_file = $upload->getSecurePath();
+                $podcast->video_public_id = $upload->getPublicId();
             }
 
-            // Actualizar los demás campos
-            $podcast->title = $request->has('title') ? $request->title : $podcast->title;
-            $podcast->description = $request->has('description') ? $request->description : $podcast->description;
-            $podcast->duration = $request->has('duration') ? $request->duration : $podcast->duration;
+            $podcast->update($request->only(['title', 'description', 'duration']));
 
-            $podcast->save();
             DB::commit();
-
-            return response()->json($podcast, 200);
+            return response()->json([
+                'status' => 'success',
+                'data' => $podcast,
+                'message' => 'Podcast actualizado exitosamente'
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Failed to update podcast: ' . $e->getMessage()], 400);
+            Log::error('Error updating podcast: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar podcast'
+            ], 500);
         }
-
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy( $id)
-
+    public function destroy($id)
     {
-
         DB::beginTransaction();
-
         try {
-            // Encontrar el podcast
             $podcast = Podcast::findOrFail($id);
 
-            // Eliminar la imagen en Cloudinary si existe
-            if ($podcast->image_file) {
-                $publicId = pathinfo(basename($podcast->image_file), PATHINFO_FILENAME);
-                Cloudinary::destroy('podcasts/images/' . $publicId);
+            if ($podcast->image_public_id) {
+                Cloudinary::destroy($podcast->image_public_id);
             }
 
-            // Eliminar el video en Cloudinary si existe
-            if ($podcast->video_file) {
-                $publicId = pathinfo(basename($podcast->video_file), PATHINFO_FILENAME);
-                Cloudinary::destroy('podcasts/videos/' . $publicId, ['resource_type' => 'video']);
+            if ($podcast->video_public_id) {
+                Cloudinary::destroy($podcast->video_public_id, ['resource_type' => 'video']);
             }
 
-            // Eliminar el registro de la base de datos
             $podcast->delete();
 
             DB::commit();
-            return response()->json(['message' => 'Podcast and associated files successfully deleted.'], 200);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Podcast eliminado exitosamente'
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Failed to delete podcast: ' . $e->getMessage()], 400);
+            Log::error('Error deleting podcast: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar podcast'
+            ], 500);
         }
-        
     }
 }

@@ -4,183 +4,251 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Audio;
-use Illuminate\Http\Request;
 use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class AudioController extends Controller
 {
-    // Listar audios con filtrado por álbum o género
     public function index(Request $request)
     {
-        $query = Audio::query();
+        try {
+            $query = Audio::query()->with(['genre', 'album']);
 
-        // Filtrar por album_id si está presente
-        if ($request->has('album_id')) {
-            $query->where('album_id', $request->album_id);
+            // Filtros
+            $filters = $request->only(['album_id', 'genre_id', 'es_binaural', 'title']);
+            foreach ($filters as $field => $value) {
+                if ($value !== null) {
+                    if ($field === 'title') {
+                        $query->where($field, 'LIKE', "%$value%");
+                    } else {
+                        $query->where($field, $value);
+                    }
+                }
+            }
+
+            $audios = $query->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $audios,
+                'message' => 'Audios obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting audios: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los audios'
+            ], 500);
         }
-
-        // Filtrar por genre_id si está presente
-        if ($request->has('genre_id')) {
-            $query->where('genre_id', $request->genre_id);
-        }
-
-        // Filtrar por es_binaural si está presente
-        if ($request->has('es_binaural')) {
-            $query->where('es_binaural', $request->es_binaural);
-        }
-
-        // Filtrar por título si está presente
-        if ($request->has('title')) {
-            $query->where('title', 'LIKE', '%' . $request->title . '%');
-        }
-
-        // Incluye la relación 'genre' y 'album'
-        $audios = $query->with(['genre', 'album'])->get();
-
-        return response()->json($audios);
     }
-    // public function index(Request $request)
-    // {
-    //     $query = Audio::query();
 
-    //     // Filtrar por album_id si está presente
-    //     if ($request->has('album_id')) {
-    //         $query->where('album_id', $request->album_id);
-    //     }
-
-    //     // Filtrar por genre_id si está presente
-    //     if ($request->has('genre_id')) {
-    //         $query->where('genre_id', $request->genre_id);
-    //     }
-
-    //     // Filtrar por es_binaural si está presente
-    //     if ($request->has('es_binaural')) {
-    //         $query->where('es_binaural', $request->es_binaural);
-    //     }
-
-    //     // Incluye la relación 'genre' y 'album'
-    //     $audios = $query->with(['genre', 'album'])->get();
-
-    //     return response()->json($audios);
-    // }
-
-    // Crear un nuevo audio
     public function store(Request $request)
     {
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'image_file' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'audio_file' => 'required|mimes:mp3,wav,aac|max:10000|unique:audios,audio_file',
-            'duration' => 'required|integer',
-            'genre_id' => 'required|exists:genres,id',
-            'album_id' => 'nullable|exists:albums,id',
-            'es_binaural' => 'required|boolean',
-            'frecuencia' => 'required_if:es_binaural,true|nullable|numeric',
-        ], [
-            'title.required' => 'El título es obligatorio.',
-            'title.string' => 'El título debe ser una cadena de texto.',
-            'title.max' => 'El título no puede exceder los 255 caracteres.',
-            'description.string' => 'La descripción debe ser una cadena de texto.',
-            'description.required' => 'La descripción es obligatoria.',
-            'image_file.required' => 'El archivo de imagen es obligatorio.',
-            'image_file.image' => 'El archivo de imagen debe ser una imagen válida.',
-            'image_file.mimes' => 'La imagen debe estar en formato jpeg, png, jpg o gif.',
-            'image_file.max' => 'La imagen no puede exceder los 2MB.',
-            'audio_file.required' => 'El archivo de audio es obligatorio.',
-            'audio_file.mimes' => 'El audio debe estar en formato mp3, wav o aac.',
-            'audio_file.max' => 'El audio no puede exceder los 10MB.',
-            'audio_file.unique' => 'Este archivo de audio ya existe en la base de datos.',
-            'duration.required' => 'La duración es obligatoria.',
-            'duration.integer' => 'La duración debe ser un número entero.',
-            'genre_id.required' => 'El ID del género es obligatorio.',
-            'genre_id.exists' => 'El género seleccionado no existe en la base de datos.',
-            'album_id.exists' => 'El álbum seleccionado no existe en la base de datos.',
-            'es_binaural.required' => 'El campo es_binaural es obligatorio.',
-            'es_binaural.boolean' => 'El campo es_binaural debe ser verdadero o falso.',
-            'frecuencia.required_if' => 'La frecuencia es obligatoria cuando es_binaural es verdadero.',
-            'frecuencia.numeric' => 'La frecuencia debe ser un valor numérico.',
-        ]);
+        DB::beginTransaction();
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'description' => 'required|string',
+                'image_file' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+                'audio_file' => 'required|mimes:mp3,wav,aac,ogg|max:25000',
+                'duration' => 'required|integer|min:1',
+                'genre_id' => 'required|exists:genres,id',
+                'album_id' => 'nullable|exists:albums,id',
+                'es_binaural' => 'required|boolean',
+                'frecuencia' => 'required_if:es_binaural,true|nullable|numeric|between:0.1,1000',
+            ], $this->validationMessages());
 
-        $imageFilePath = $request->hasFile('image_file')
-            ? Cloudinary::upload($request->file('image_file')->getRealPath(), ['folder' => 'audios/images'])->getSecurePath()
-            : null;
+            // Subir imagen
+            $imageUpload = Cloudinary::upload(
+                $request->file('image_file')->getRealPath(),
+                ['folder' => 'musicoterapia/images']
+            );
 
-        $audioFilePath = Cloudinary::upload($request->file('audio_file')->getRealPath(), [
-            'resource_type' => 'video',
-            'folder' => 'audios/mp3'
-        ])->getSecurePath();
+            // Subir audio
+            $audioUpload = Cloudinary::upload(
+                $request->file('audio_file')->getRealPath(),
+                [
+                    'resource_type' => 'video',
+                    'folder' => 'musicoterapia/audios'
+                ]
+            );
 
-        $audio = Audio::create(array_merge($request->only([
-            'title',
-            'description',
-            'duration',
-            'genre_id',
-            'album_id',
-            'es_binaural',
-            'frecuencia'
-        ]), [
-            'image_file' => $imageFilePath,
-            'audio_file' => $audioFilePath,
-        ]));
+            $audio = Audio::create([
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'image_file' => $imageUpload->getSecurePath(),
+                'image_public_id' => $imageUpload->getPublicId(),
+                'audio_file' => $audioUpload->getSecurePath(),
+                'audio_public_id' => $audioUpload->getPublicId(),
+                'duration' => $validated['duration'],
+                'genre_id' => $validated['genre_id'],
+                'album_id' => $validated['album_id'],
+                'es_binaural' => $validated['es_binaural'],
+                'frecuencia' => $validated['frecuencia'],
+            ]);
 
-        return response()->json($audio, 201);
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $audio,
+                'message' => 'Audio creado exitosamente'
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating audio: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al crear el audio: ' . $e->getMessage()
+            ], 400);
+        }
     }
 
-    // Mostrar un audio específico
     public function show($id)
     {
-        $audio = Audio::with(['genre', 'album', 'tags', 'likes', 'histories', 'playlists'])->findOrFail($id);
-        return response()->json($audio);
+        try {
+            $audio = Audio::with(['genre', 'album', 'tags', 'likes', 'histories', 'playlists'])
+                ->findOrFail($id);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $audio,
+                'message' => 'Audio obtenido exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error getting audio: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Audio no encontrado'
+            ], 404);
+        }
     }
 
-    // Actualizar un audio existente
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'sometimes|nullable|string',
-            'image_file' => 'sometimes|nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'audio_file' => 'sometimes|nullable|mimes:mp3,wav,aac|max:10000|unique:audios,audio_file,' . $id,
-            'duration' => 'sometimes|required|integer',
-            'genre_id' => 'sometimes|required|exists:genres,id',
-            'album_id' => 'sometimes|nullable|exists:albums,id',
-            'es_binaural' => 'sometimes|required|boolean',
-            'frecuencia' => 'sometimes|required_if:es_binaural,true|nullable|numeric',
-        ]);
+        DB::beginTransaction();
+        try {
+            $audio = Audio::findOrFail($id);
 
-        $audio = Audio::findOrFail($id);
+            $validated = $request->validate([
+                'title' => 'sometimes|string|max:255',
+                'description' => 'sometimes|string',
+                'image_file' => 'sometimes|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
+                'audio_file' => 'sometimes|mimes:mp3,wav,aac,ogg|max:25000',
+                'duration' => 'sometimes|integer|min:1',
+                'genre_id' => 'sometimes|exists:genres,id',
+                'album_id' => 'sometimes|nullable|exists:albums,id',
+                'es_binaural' => 'sometimes|boolean',
+                'frecuencia' => 'required_if:es_binaural,true|nullable|numeric|between:0.1,1000',
+            ], $this->validationMessages());
 
-        if ($request->hasFile('image_file')) {
-            $audio->image_file = Cloudinary::upload($request->file('image_file')->getRealPath(), ['folder' => 'images'])->getSecurePath();
+            // Actualizar imagen
+            if ($request->hasFile('image_file')) {
+                // Eliminar imagen anterior
+                if ($audio->image_public_id) {
+                    Cloudinary::destroy($audio->image_public_id);
+                }
+
+                $imageUpload = Cloudinary::upload(
+                    $request->file('image_file')->getRealPath(),
+                    ['folder' => 'musicoterapia/images']
+                );
+
+                $audio->image_file = $imageUpload->getSecurePath();
+                $audio->image_public_id = $imageUpload->getPublicId();
+            }
+
+            // Actualizar audio
+            if ($request->hasFile('audio_file')) {
+                // Eliminar audio anterior
+                if ($audio->audio_public_id) {
+                    Cloudinary::destroy($audio->audio_public_id, ['resource_type' => 'video']);
+                }
+
+                $audioUpload = Cloudinary::upload(
+                    $request->file('audio_file')->getRealPath(),
+                    [
+                        'resource_type' => 'video',
+                        'folder' => 'musicoterapia/audios'
+                    ]
+                );
+
+                $audio->audio_file = $audioUpload->getSecurePath();
+                $audio->audio_public_id = $audioUpload->getPublicId();
+            }
+
+            // Actualizar otros campos
+            $audio->fill($validated);
+            $audio->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $audio,
+                'message' => 'Audio actualizado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating audio: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al actualizar el audio: ' . $e->getMessage()
+            ], 400);
         }
-
-        if ($request->hasFile('audio_file')) {
-            $audio->audio_file = Cloudinary::upload($request->file('audio_file')->getRealPath(), ['resource_type' => 'video', 'folder' => 'audios'])->getSecurePath();
-        }
-
-        $audio->update($request->except(['image_file', 'audio_file']));
-        return response()->json($audio, 200);
     }
 
-    // Eliminar un audio
     public function destroy($id)
     {
         DB::beginTransaction();
         try {
             $audio = Audio::findOrFail($id);
-            if ($audio->image_file)
-                Cloudinary::destroy('images/' . pathinfo($audio->image_file, PATHINFO_FILENAME));
-            if ($audio->audio_file)
-                Cloudinary::destroy('audios/' . pathinfo($audio->audio_file, PATHINFO_FILENAME), ['resource_type' => 'video']);
+
+            // Eliminar recursos de Cloudinary
+            if ($audio->image_public_id) {
+                Cloudinary::destroy($audio->image_public_id);
+            }
+
+            if ($audio->audio_public_id) {
+                Cloudinary::destroy($audio->audio_public_id, ['resource_type' => 'video']);
+            }
+
             $audio->delete();
+
             DB::commit();
-            return response()->json(['message' => 'Audio eliminado correctamente.'], 200);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Audio eliminado permanentemente'
+            ]);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Error al eliminar el audio: ' . $e->getMessage()], 400);
+            Log::error('Error deleting audio: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al eliminar el audio'
+            ], 500);
         }
+    }
+
+    private function validationMessages()
+    {
+        return [
+            'title.required' => 'El título es obligatorio',
+            'audio_file.required' => 'El archivo de audio es obligatorio',
+            'audio_file.mimes' => 'Formatos permitidos: mp3, wav, aac, ogg',
+            'audio_file.max' => 'El audio no puede superar los 25MB',
+            'image_file.image' => 'El archivo debe ser una imagen válida',
+            'frecuencia.required_if' => 'La frecuencia es obligatoria para sonidos binaurales',
+            'genre_id.exists' => 'El género seleccionado no existe',
+            'duration.min' => 'La duración mínima es 1 segundo',
+        ];
     }
 }

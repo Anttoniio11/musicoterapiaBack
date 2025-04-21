@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::create('likes', function (Blueprint $table) {
             $table->id();
 
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // Relación con el usuario
-            $table->morphs('likeable'); // Relación polimórfica
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->morphs('likeable');
 
-            $table->timestamps(); // Incluye 'created_at' para la fecha de cuando se dio like
+            $table->timestamps();
         });
     }
 

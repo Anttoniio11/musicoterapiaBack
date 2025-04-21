@@ -15,8 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->string('name')->unique(); // Nombre del tag, debe ser único
-
-
+            
             $table->timestamps();
         });
     }

@@ -11,7 +11,19 @@ class Audio extends Model
     use HasFactory, ApiTrait;
 
     protected $table = 'audios';
-    protected $guarded = [];
+    protected $fillable = [
+        'title',
+        'description',
+        'image_file',
+        'image_public_id',
+        'audio_file',
+        'audio_public_id',
+        'duration',
+        'genre_id',
+        'album_id',
+        'es_binaural',
+        'frecuencia'
+    ];
 
     // Listas blancas para inclusión, filtrado y ordenamiento en la API
     protected $allowIncluded = ['genre', 'album', 'playlists', 'tags', 'likes', 'histories'];

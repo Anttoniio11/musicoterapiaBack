@@ -13,11 +13,9 @@ return new class extends Migration
     {
         Schema::create('playlist_podcast', function (Blueprint $table) {
             $table->id();
-
-            $table->foreignId('playlist_id')->constrained('playlists')->onDelete('cascade');
-            $table->foreignId('podcast_id')->constrained('podcasts')->onDelete('cascade');
-
-
+            $table->foreignId('playlist_id')->constrained()->onDelete('cascade');
+            $table->foreignId('podcast_id')->constrained()->onDelete('cascade');
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }
