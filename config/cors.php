@@ -16,10 +16,11 @@ return [
     */
 
 
-    'paths' => ['api/', 'v1/'],  // Permite CORS en rutas específicas
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],  // Permite CORS en rutas específicas
     'allowed_methods' => [''],  // Permite todos los métodos HTTP (GET, POST, PUT, DELETE, etc.)
     // TODO: just allow the frontend origin
-    'allowed_origins' => [''],  // Permite solicitudes desde cualquier origen
+    // 'allowed_origins' => ['http://localhost:3000'],
+    'allowed_origins' => ['*'],  // Permite solicitudes desde cualquier origen
     'allowed_origins_patterns' => [],  // Puedes agregar patrones específicos si es necesario
     'allowed_headers' => [''],  // Permite todos los encabezados en las solicitudes
     'exposed_headers' => [],  // Lista de encabezados que serán visibles en el cliente

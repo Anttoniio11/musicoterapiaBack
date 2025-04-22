@@ -31,7 +31,7 @@ class PlaylistController extends Controller
         $playlist = Playlist::create([
             'name' => $request->name,
             'description' => $request->description,
-            'user_id' => Auth::id()
+            'user_id' => Auth::check() ? Auth::id() : null
         ]);
 
         return response()->json([

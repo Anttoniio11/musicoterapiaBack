@@ -30,6 +30,10 @@ class Audio extends Model
     protected $allowFilter = ['id', 'title', 'es_binaural', 'duration', 'album_id']; // Se agrega 'album_id' para filtrar por álbum
     protected $allowSort = ['id', 'title'];
 
+    protected $casts = [
+        'es_binaural' => 'boolean'
+    ];
+
     // Relación Uno a Muchos Inversa con Genre
     public function genre()
     {
@@ -48,10 +52,15 @@ class Audio extends Model
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
-    // Relación Uno a Muchos polimórfica inversa con el modelo Like
+    // Agrega esto al modelo Audio
     public function likes()
     {
-        return $this->morphMany(Like::class, 'likeable');
+        return $this->hasMany(Like::class);
+    }
+
+    public function isLikedByUser($userId)
+    {
+        return $this->likes()->where('user_id', $userId)->exists();
     }
 
     // Relación Uno a Muchos polimórfica con el modelo History

@@ -13,7 +13,7 @@ class Playlist extends Model
     protected $table = 'playlists';
     protected $guarded = [];
 
-    // Listas Blancas para incluir relaciones, filtrar y ordenar
+    protected $fillable = ['name', 'description', 'user_id'];
 
     protected $allowIncluded = ['user', 'audios', 'podcasts']; // Relaciona con User, Audio, Podcast
     protected $allowFilter = ['id', 'name', 'description', 'user_id']; // Filtros posibles
