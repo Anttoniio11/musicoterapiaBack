@@ -88,4 +88,25 @@ class LikeController extends Controller
             ], 500);
         }
     }
+
+    public function getAllLikedAudios()
+    {
+        try {
+            $audios = Audio::whereHas('likes')
+                ->withCount('likes')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $audios,
+                'message' => 'Audios con likes obtenidos exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Error al obtener los audios con likes'
+            ], 500);
+        }
+    }
 }

@@ -61,6 +61,7 @@ use App\Http\Controllers\Api\PlaylistController;
         Route::post('/toggle/{audioId}', [LikeController::class, 'toggleLike']);
         Route::get('/check/{audioId}', [LikeController::class, 'checkLike']);
         Route::get('/user', [LikeController::class, 'getUserLikes']);
+        Route::get('/liked', [LikeController::class, 'getAllLikedAudios']);
     });
 
 
