@@ -13,24 +13,17 @@ class LikeController extends Controller
     public function toggleLike($audioId)
     {
         try {
-            $user = Auth::user();
             $audio = Audio::findOrFail($audioId);
-
-            $like = Like::where('user_id', $user->id)
-                        ->where('audio_id', $audioId)
-                        ->first();
+            $like = Like::where('audio_id', $audioId)->first();
 
             if ($like) {
                 $like->delete();
-                $message = 'Like eliminado';
                 $liked = false;
+                $message = 'Like eliminado';
             } else {
-                Like::create([
-                    'user_id' => $user->id,
-                    'audio_id' => $audioId
-                ]);
-                $message = 'Like agregado';
+                Like::create(['audio_id' => $audioId]);
                 $liked = true;
+                $message = 'Like agregado';
             }
 
             return response()->json([
@@ -48,27 +41,23 @@ class LikeController extends Controller
         }
     }
 
-    public function checkLike($audioId)
-    {
-        try {
-            $user = Auth::user();
-            $liked = Like::where('user_id', $user->id)
-                        ->where('audio_id', $audioId)
-                        ->exists();
+public function checkLike($audioId)
+{
+    try {
+        $liked = Like::where('audio_id', $audioId)->exists();
 
-            return response()->json([
-                'status' => 'success',
-                'liked' => $liked
-            ]);
+        return response()->json([
+            'status' => 'success',
+            'liked' => $liked
+        ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Error al verificar el like'
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Error al verificar el like'
+        ], 500);
     }
-
+}
     public function getUserLikes()
     {
         try {
