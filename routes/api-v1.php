@@ -38,7 +38,7 @@ use App\Http\Controllers\Api\PlaylistController;
     // Podcasts
     Route::get('podcasts', [PodcastController::class, 'index']);
     Route::post('podcasts', [PodcastController::class, 'store']);
-    Route::get('podcasts/{id}', [PodcastController::class, 'show']);
+    Route::get('podcasts/{podcast}', [PodcastController::class, 'show']);
     Route::put('podcasts/{id}', [PodcastController::class, 'update']);
     Route::delete('podcasts/{id}', [PodcastController::class, 'destroy']);
 
